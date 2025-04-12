@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, current_app
+from flask import Blueprint, jsonify
 import pandas as pd
 import os
 
@@ -6,31 +6,29 @@ variables_bp = Blueprint('variables', __name__)
 
 @variables_bp.route('/api/variables', methods=['GET'])
 def get_variables():
-    # 从上传的文件中读取变量信息
-    upload_folder = current_app.config['UPLOAD_FOLDER']
-    file_path = os.path.join(upload_folder, 'latest_upload.csv')
-    
-    if not os.path.exists(file_path):
-        return jsonify({'error': '文件不存在，请先上传数据'}), 404
-    
     try:
-        # 读取CSV文件获取列名
-        df = pd.read_csv(file_path)
-        columns = df.columns.tolist()
+        # 从上传的文件中读取变量信息
+        file_path = 'uploads/latest_upload.csv'
         
-        # 构建变量数据
+        if not os.path.exists(file_path):
+            return jsonify({'error': '请先上传数据文件'}), 400
+        
+        # 读取CSV文件获取列名和类型
+        df = pd.read_csv(file_path)
         variables = []
-        for idx, col in enumerate(columns):
-            # 这里可以根据实际需求添加更多变量属性
+        
+        for idx, col in enumerate(df.columns):
             col_type = str(df[col].dtype)
             variables.append({
                 'id': idx + 1,
                 'name': col,
                 'type': col_type,
-                'status': 1  # 1表示可用，0表示禁用
+                'status': 1  # 默认所有变量可用
             })
         
         return jsonify(variables)
-    
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'error': f'获取变量失败: {str(e)}'
+        }), 500
