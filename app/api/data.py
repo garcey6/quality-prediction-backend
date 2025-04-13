@@ -26,20 +26,29 @@ def upload_file():
         if not os.path.exists(UPLOAD_FOLDER):
             os.makedirs(UPLOAD_FOLDER)
         
+        # 保存原始文件
         filepath = os.path.join(UPLOAD_FOLDER, filename)
         file.save(filepath)
         
+        # 创建latest_upload.csv副本
+        latest_path = os.path.join(UPLOAD_FOLDER, 'latest_upload.csv')
+        with open(latest_path, 'wb') as f:
+            file.seek(0)
+            f.write(file.read())
+        
         try:
-            # 读取原始数据
-            original_data = pd.read_csv(filepath).to_dict(orient='records')
+            # 读取原始数据（保留原始列名）
+            df = pd.read_csv(filepath, header=0)  # 确保使用第一行作为列名
+            original_data = df.to_dict(orient='records')
             
-            # 创建处理后的数据副本（这里可以添加初始处理逻辑）
-            processed_data = pd.read_csv(filepath).to_dict(orient='records')
+            # 创建处理后的数据副本（保持列名不变）
+            processed_data = df.copy().to_dict(orient='records')
             
             return jsonify({
                 'original': original_data,
-                'processed': processed_data
-            }),200
+                'processed': processed_data,
+                'columns': list(df.columns)  # 返回列名列表
+            }), 200
             
         except Exception as e:
             return jsonify({
