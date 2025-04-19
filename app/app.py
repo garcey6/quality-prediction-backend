@@ -15,14 +15,14 @@ def create_app():
     from api.variables import variables_bp
     from api.visualization import visualization_bp
     from api.FeatureSelection import feature_selection_bp
-    # from api.exception import exception_bp
+    from api.FeatureExtraction import feature_extraction_bp
     
     blueprints = [
         data_bp,
         variables_bp,
         visualization_bp,
         feature_selection_bp,
-        # exception_bp
+        feature_extraction_bp
     ]
     
     for bp in blueprints:
