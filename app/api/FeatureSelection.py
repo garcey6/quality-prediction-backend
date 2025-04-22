@@ -6,22 +6,53 @@ from scipy.stats import pearsonr
 
 feature_selection_bp = Blueprint('feature_selection', __name__)
 
-@feature_selection_bp.route('/api/feature_selection/filter', methods=['POST'])
+# 新增获取变量列表接口
+@feature_selection_bp.route('/api/feature-selection/variables', methods=['GET'])
+def get_feature_variables():
+    try:
+        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
+        if not os.path.exists(file_path):
+            return jsonify({'status': 'error', 'message': '请先上传数据文件'}), 400
+            
+        df = pd.read_csv(file_path)
+        
+        # 修改返回数据结构，直接返回数组
+        variables = [
+            {
+                'id': idx + 1,
+                'name': col,
+                'type': str(df[col].dtype),
+                'status': 1  # 默认状态
+            } 
+            for idx, col in enumerate(df.columns)
+        ]
+        
+        return jsonify(variables)  # 直接返回数组
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'获取变量列表失败: {str(e)}'
+        }), 500
+
+# 修改特征选择接口
+@feature_selection_bp.route('/api/feature-selection/select', methods=['POST'])
 def feature_selection():
     try:
-        # 检查请求数据
         if not request.is_json:
             return jsonify({'error': '请求必须是JSON格式'}), 400
             
         data = request.json
-        if 'target' not in data:
-            return jsonify({'error': '缺少target参数'}), 400
-        if 'threshold' not in data:
+        target_var = data.get('target_variable')  # 修改参数名
+        threshold = data.get('threshold')
+        
+        if not target_var:
+            return jsonify({'error': '缺少target_variable参数'}), 400
+        if threshold is None:
             return jsonify({'error': '缺少threshold参数'}), 400
             
-        target_var = data['target']
         try:
-            threshold = float(data['threshold'])
+            threshold = float(threshold)
         except ValueError:
             return jsonify({'error': 'threshold必须是数值类型'}), 400
             

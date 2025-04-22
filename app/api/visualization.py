@@ -1,9 +1,10 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import os
 import base64
 from io import BytesIO
 import seaborn as sns
@@ -13,51 +14,53 @@ visualization_bp = Blueprint('visualization', __name__, url_prefix='/api/visuali
 @visualization_bp.route('/multivariate', methods=['POST'])
 def multivariate_visualization():
     try:
-        # 检查请求数据
-        if not request.is_json:
-            return jsonify({'error': '请求必须是JSON格式'}), 400
-            
-        request_data = request.json
-        if 'data' not in request_data:
-            return jsonify({'error': '请求中缺少data字段'}), 400
-            
-        data = request_data['data']
-        if not isinstance(data, list):
-            return jsonify({'error': 'data必须是列表格式'}), 400
-            
-        if len(data) == 0:
-            return jsonify({'error': '数据不能为空列表'}), 400
-            
-        # 验证数据项格式
-        for i, item in enumerate(data):
-            if not isinstance(item, dict):
-                return jsonify({'error': f'第{i+1}条数据必须是字典格式'}), 400
-            if len(item) == 0:
-                return jsonify({'error': f'第{i+1}条数据不能为空字典'}), 400
-
-        # 记录接收到的数据信息
-        print(f"接收到数据，记录数: {len(data)}")
-        print(f"包含变量: {list(data[0].keys())}")
+        # 获取文件路径
+        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
         
+        if not os.path.exists(file_path):
+            return jsonify({'error': '请先上传数据文件'}), 400
+
         # 生成相关性热力图
-        image_base64 = generate_correlation_heatmap(data)
+        image_base64 = generate_correlation_heatmap(file_path)
         
         return jsonify({
             'image': image_base64,
             'message': '相关性热力图生成成功'
         })
         
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': f'生成热力图时出错: {str(e)}'}), 500
 
-def generate_correlation_heatmap(data):
-    """生成参数相关性热力图"""
-    # 转换为DataFrame并确保所有值为数值类型
-    df = pd.DataFrame(data)
+@visualization_bp.route('/generate', methods=['GET'])  # 修改为GET方法以匹配前端
+def generate_visualization():
+    try:
+        # 获取文件路径
+        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': '请先上传数据文件'}), 400
+
+        # 生成相关性热力图
+        image_base64 = generate_correlation_heatmap(file_path)
+        
+        return jsonify({
+            'status': 'success',
+            'image': image_base64,
+            'message': '相关性热力图生成成功'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'生成热力图时出错: {str(e)}'
+        }), 500
+
+def generate_correlation_heatmap(file_path):
+    """从文件生成参数相关性热力图"""
+    # 读取CSV文件
+    df = pd.read_csv(file_path)
     
-    # 移除非数值列（如Timestamp、batch_id等）
+    # 移除非数值列
     numeric_cols = df.select_dtypes(include=['number']).columns
     if len(numeric_cols) < 2:
         raise ValueError("至少需要2个数值列才能计算相关性")

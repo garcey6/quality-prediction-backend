@@ -32,9 +32,8 @@ def upload_file():
         
         # 创建latest_upload.csv副本
         latest_path = os.path.join(UPLOAD_FOLDER, 'latest_upload.csv')
-        with open(latest_path, 'wb') as f:
-            file.seek(0)
-            f.write(file.read())
+        df = pd.read_csv(filepath)
+        df.to_csv(latest_path, index=False)  # 使用pandas保存确保格式一致
         
         try:
             # 读取原始数据（保留原始列名）
