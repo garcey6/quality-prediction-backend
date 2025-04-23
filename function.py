@@ -32,10 +32,13 @@ X_scaled = scaler.fit_transform(X)
 selector = VarianceThreshold(threshold=0.01)
 X_selected = selector.fit_transform(X_scaled)
 
-# 5. 特征提取（例如统计特征，或直接使用原始的已提取特征）
+# 5. 特征提取 - 添加PCA方法
+from sklearn.decomposition import PCA
+pca = PCA(n_components=0.98)  # 保留95%的方差
+X_pca = pca.fit_transform(X_selected)
 
-# 6. PLS 建模
-X_train, X_test, y_train, y_test = train_test_split(X_selected, y, test_size=0.2, random_state=42)
+# 6. PLS 建模 - 使用PCA处理后的数据
+X_train, X_test, y_train, y_test = train_test_split(X_pca, y, test_size=0.2, random_state=42)
 
 pls = PLSRegression(n_components=5)
 pls.fit(X_train, y_train)

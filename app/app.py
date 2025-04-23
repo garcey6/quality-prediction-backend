@@ -19,6 +19,7 @@ def create_app():
     from api.FeatureSelection import feature_selection_bp
     from api.FeatureExtraction import feature_extraction_bp
     from api.pls import pls_bp  
+    from api.QualityPrediction import quality_bp
     
     blueprints = [
         data_bp,
@@ -28,7 +29,8 @@ def create_app():
         visualization_bp,
         feature_selection_bp,
         feature_extraction_bp,
-        pls_bp  
+        pls_bp,
+        quality_bp
     ]
     
     for bp in blueprints:

@@ -16,18 +16,10 @@ def get_feature_variables():
             
         df = pd.read_csv(file_path)
         
-        # 修改返回数据结构，直接返回数组
-        variables = [
-            {
-                'id': idx + 1,
-                'name': col,
-                'type': str(df[col].dtype),
-                'status': 1  # 默认状态
-            } 
-            for idx, col in enumerate(df.columns)
-        ]
+        # 只返回变量名数组
+        variables = [col for col in df.columns]
         
-        return jsonify(variables)  # 直接返回数组
+        return jsonify(variables)
         
     except Exception as e:
         return jsonify({

@@ -26,7 +26,7 @@ def pls_prediction():
             }), 400
             
         # 读取质量标签数据
-        label_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'data_.csv')
+        label_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
         if not os.path.exists(label_path):
             return jsonify({
                 'status': 'error',
