@@ -29,15 +29,26 @@ def pls_prediction():
         # 加载数据
         df = pd.read_csv(data_path)
         
-        # 分离特征和标签
-        if 'Penicillin concentration' not in df.columns:
+        # 检查数据列
+        selection_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'feature_selection_result.csv')
+        if not os.path.exists(selection_path):
             return jsonify({
                 'status': 'error',
-                'message': '数据文件中缺少"Penicillin concentration"列'
+                'message': '请先进行特征选择'
             }), 400
             
-        X = df.drop(columns=['Penicillin concentration'])
-        y = df['Penicillin concentration']
+        selected_df = pd.read_csv(selection_path)
+        target_column = selected_df['target'].iloc[0]  # 假设特征选择结果中包含target列
+        
+        if target_column not in df.columns:
+            return jsonify({
+                'status': 'error',
+                'message': f'数据文件中缺少目标变量列: {target_column}'
+            }), 400
+            
+        # 分离特征和标签
+        X = df.drop(columns=[target_column])
+        y = df[target_column]
         
         # 数据标准化
         scaler = StandardScaler()
@@ -63,7 +74,9 @@ def pls_prediction():
         r2 = r2_score(y_test, y_pred)
         
         # 保存模型
-        model_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'pls_model.pkl')
+        model_dir = os.path.join(os.path.dirname(__file__), '../../models')
+        os.makedirs(model_dir, exist_ok=True)
+        model_path = os.path.join(model_dir, 'pls_model.pkl')
         pd.to_pickle(pls, model_path)
         
         # 保存预测结果

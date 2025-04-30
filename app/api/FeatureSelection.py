@@ -135,7 +135,8 @@ def feature_selection():
         result_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'feature_selection_result.csv')
         result_df = pd.DataFrame({
             'feature': selected_features,
-            'score': feature_scores
+            'score': feature_scores,
+            'target': [actual_target_var] * len(selected_features)  # 添加目标变量信息
         })
         result_df.to_csv(result_path, index=False)
 

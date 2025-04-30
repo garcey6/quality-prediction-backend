@@ -1,5 +1,3 @@
-feature,score
-Dissolved oxygen volume fraction,0.859397616428184
-Culture Volume,0.9878622729797188
-ph,0.9019753769624785
-Generated Heat,0.9992827468610127
+feature,score,target
+采样时刻,0.9574245552357263,青霉素浓度
+冷却水流速,0.9572538890009985,青霉素浓度

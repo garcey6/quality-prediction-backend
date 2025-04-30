@@ -28,7 +28,7 @@ def visualize_prediction():
             return jsonify({'status': 'error', 'message': '请求必须是JSON格式'}), 400
             
         data = request.json
-        model_type = data.get('model_type', 'pls')  # 支持多种模型
+        model_type = data.get('model_type', 'lstm')  # 支持多种模型
         
         # 根据模型类型获取预测结果文件
         pred_path = os.path.join(
@@ -61,41 +61,40 @@ def visualize_prediction():
             '样本数': len(df)
         }
         
-        # 创建可视化图形
-        plt.figure(figsize=(12, 6))
-        
-        # 1. 实际值 vs 预测值散点图
-        plt.subplot(1, 2, 1)
-        sns.scatterplot(x='实际值', y='预测值', data=df)
-        plt.plot([df['实际值'].min(), df['实际值'].max()], 
-                [df['实际值'].min(), df['实际值'].max()], 
-                'r--')
-        plt.title(f'{model_type.upper()}预测结果对比')
-        plt.xlabel('实际值')
-        plt.ylabel('预测值')
-        
-        # 2. 残差图
-        plt.subplot(1, 2, 2)
-        residuals = df['实际值'] - df['预测值']
-        sns.histplot(residuals, kde=True)
-        plt.title('预测残差分布')
-        plt.xlabel('残差')
-        
+        # 创建可视化图形 - 改为单图形式
+        plt.figure(figsize=(10, 6))
+        # 对实际值进行排序，并保持预测值对应关系
+        sorted_indices = np.argsort(df['实际值'].values)
+        plt.plot(np.sort(df['实际值'].values), color='blue', label='实际值', linewidth=2)
+        plt.plot(df['预测值'].values[sorted_indices], color='red', label='预测值', linewidth=2)
+        plt.title(f'{model_type.upper()}预测结果对比(按实际值排序)')
+        plt.xlabel('样本(按实际值排序)')
+        plt.ylabel('浓度值')
+        plt.legend()
         plt.tight_layout()
         
-        # 转换为base64 (沿用visualization.py的方式)
+        # 转换为base64
         buf = BytesIO()
         plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
         plt.close()
         buf.seek(0)
         image_base64 = base64.b64encode(buf.read()).decode('utf-8')
         
+        # 保存图片文件 - 修改为固定文件名
+        img_path = os.path.join(
+            current_app.config['UPLOAD_FOLDER'],
+            f'quality_prediction_{model_type}.png'  # 移除时间戳
+        )
+        with open(img_path, 'wb') as f:
+            f.write(base64.b64decode(image_base64))
+        
         return jsonify({
             'status': 'success',
             'message': f'{model_type.upper()}预测可视化完成',
             'data': {
                 'metrics': metrics,
-                'image': image_base64  # 直接返回base64字符串
+                'image': image_base64,
+                'image_path': img_path
             }
         })
         
