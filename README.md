@@ -46,4 +46,5 @@ flask-back-end/
    ```
 
 ## 运行项目
-运行run.py文件即可
+运行run.py文件即可，默认启动在本地的5000端口。
+注意要与前端同时运行否则会反馈network error。
