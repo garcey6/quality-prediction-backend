@@ -1,7 +1,10 @@
 # 间歇过程质量预测系统 - 后端服务
 
 ## 项目概述
-基于Flask框架开发的间歇过程质量预测系统后端服务，提供RESTful API接口支持前端数据展示和预测功能,前端地址在https://github.com/garcey6/quality-prediction-frontend.git
+基于Flask框架开发的间歇过程质量预测系统后端服务，提供RESTful API接口支持前端数据展示和预测功能。
+
+前端项目地址: [quality-prediction-frontend](https://github.com/garcey6/quality-prediction-frontend.git)
+
 
 ## 项目结构
 flask-back-end/
