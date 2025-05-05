@@ -19,7 +19,10 @@ def create_app():
     from api.FeatureSelection import feature_selection_bp
     from api.FeatureExtraction import feature_extraction_bp
     from api.pls import pls_bp  
+    from api.rnn import rnn_bp
+    from api.gru import gru_bp
     from api.lstm import lstm_bp
+    from api.transformer import transformer_bp
     from api.QualityPrediction import quality_bp
     
     blueprints = [
@@ -31,7 +34,10 @@ def create_app():
         feature_selection_bp,
         feature_extraction_bp,
         pls_bp,
+        rnn_bp,
+        gru_bp,
         lstm_bp,
+        transformer_bp,
         quality_bp
     ]
     

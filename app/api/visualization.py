@@ -15,7 +15,7 @@ visualization_bp = Blueprint('visualization', __name__, url_prefix='/api/visuali
 def multivariate_visualization():
     try:
         # 获取文件路径
-        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
+        file_path = os.path.join(current_app.root_path,'uploads',f'latest_upload.csv')
         
         if not os.path.exists(file_path):
             return jsonify({'error': '请先上传数据文件'}), 400
@@ -35,7 +35,7 @@ def multivariate_visualization():
 def generate_visualization():
     try:
         # 获取文件路径
-        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
+        file_path = os.path.join(current_app.root_path,'uploads',f'latest_upload.csv')
         
         if not os.path.exists(file_path):
             return jsonify({'error': '请先上传数据文件'}), 400

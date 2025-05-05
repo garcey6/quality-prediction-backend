@@ -21,7 +21,7 @@ def feature_extraction():
                 return jsonify({'status': 'error', 'message': f'缺少{field}参数'}), 400
         
         # 从上传的文件获取数据
-        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
+        filepath = os.path.join(current_app.root_path,'uploads',f'latest_upload.csv')
         if not os.path.exists(filepath):
             return jsonify({
                 'status': 'error',
@@ -37,7 +37,7 @@ def feature_extraction():
             }), 500
 
         # 读取特征选择结果文件
-        selection_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'feature_selection_result.csv')
+        selection_path = os.path.join(current_app.root_path,'uploads',f'feature_selection_result.csv')
         if os.path.exists(selection_path):
             selected_df = pd.read_csv(selection_path)
             selected_features = selected_df['feature'].tolist()
@@ -64,22 +64,27 @@ def feature_extraction():
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
-        # PCA特征提取
-        n_components = data.get('n_components', 2)
-        pca = PCA(n_components=n_components)
+        # 从请求中获取方差阈值参数，默认为0.98
+        variance_threshold = float(data.get('variance_threshold', 0.98))
+        
+        # PCA特征提取 - 使用前端传入的方差阈值
+        pca = PCA(n_components=variance_threshold)
         principal_components = pca.fit_transform(X_scaled)
         
-        # 创建结果DataFrame
-        pc_columns = [f'PC{i+1}' for i in range(n_components)]
-        result_df = pd.DataFrame(data=principal_components, columns=pc_columns)
+        # 获取实际保留的主成分数量
+        n_components_retained = pca.n_components_
         
-        # 保存结果
-        result_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'feature_extraction_result.csv')
+        # 创建结果DataFrame并保存
+        pc_columns = [f'PC{i+1}' for i in range(n_components_retained)]
+        result_df = pd.DataFrame(data=principal_components, columns=pc_columns)
+        result_path = os.path.join(current_app.root_path,'uploads',f'feature_extraction_result.csv')
         result_df.to_csv(result_path, index=False)
         
         return jsonify({
             'status': 'success',
-            'message': f'PCA提取完成，保留{n_components}个主成分'
+            'message': f'PCA提取完成，保留{n_components_retained}个主成分({variance_threshold*100}%方差)',
+            'n_components_retained': int(n_components_retained),  # 转换为Python int
+            'explained_variance_ratio': [float(x) for x in pca.explained_variance_ratio_]  # 转换为Python float列表
         })
         
     except Exception as e:

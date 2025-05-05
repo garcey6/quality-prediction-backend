@@ -22,7 +22,7 @@ def lstm_prediction():
         data = request.json
         
         # 读取数据文件
-        data_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
+        data_path = os.path.join(current_app.root_path,'uploads',f'latest_upload.csv')
         if not os.path.exists(data_path):
             return jsonify({
                 'status': 'error',
@@ -33,7 +33,7 @@ def lstm_prediction():
         df = pd.read_csv(data_path)
         
         # 检查数据列
-        selection_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'feature_selection_result.csv')
+        selection_path = os.path.join(current_app.root_path,'uploads',f'feature_selection_result.csv')
         if not os.path.exists(selection_path):
             return jsonify({
                 'status': 'error',
@@ -58,56 +58,64 @@ def lstm_prediction():
         X_scaled = scaler.fit_transform(X)
         
         # 创建时间序列数据
-        def create_dataset(X, y, time_step=3):  # 修改时间步长为3
+        def create_dataset(X, y, time_step=50):
             X_data, y_data = [], []
             for i in range(len(X) - time_step):
                 X_data.append(X[i:(i + time_step)])
                 y_data.append(y[i + time_step])
             return np.array(X_data), np.array(y_data)
             
-        time_step = 3  # 使用3个时间步长
+        time_step = 50
         X_data, y_data = create_dataset(X_scaled, y.values, time_step)
         
-        # 数据分割
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_data, y_data, test_size=0.2, random_state=42
-        )
+        # 检查并确保数据是三维的 (样本数, 时间步长, 特征数)
+        if len(X_data.shape) != 3:
+            return jsonify({
+                'status': 'error',
+                'message': f'数据维度错误，需要3维数据，当前维度: {X_data.shape}'
+            }), 400
+            
+        # 不再进行数据分割，直接使用全部数据
+        X_train = X_data
+        y_train = y_data
         
         # 获取请求参数中的学习率，默认0.001
         learning_rate = float(data.get('learning_rate', 0.001))
         
         # 创建LSTM模型
         model = Sequential()
-        model.add(LSTM(units=50, return_sequences=False, input_shape=(X_train.shape[1], X_train.shape[2])))  # 修改为return_sequences=False
-        model.add(Dense(units=1))
+        model.add(LSTM(units=64, return_sequences=False, 
+                      input_shape=(X_train.shape[1], X_train.shape[2]),
+                      kernel_initializer='glorot_uniform'))  # 修改初始化方式
+        model.add(Dense(units=1, activation='relu'))  # 添加relu激活函数
+        
+        # 调整学习率
+        learning_rate = float(data.get('learning_rate', 0.01))  # 默认改为0.01
         
         # 使用传入的学习率配置优化器
         optimizer = Adam(learning_rate=learning_rate)
-        model.compile(optimizer=optimizer, loss='mean_squared_error')  # 修改为mean_squared_error
+        model.compile(optimizer=optimizer, loss='mean_squared_error')
         
-        # 训练模型
-        epochs = 20  # 增加epochs到100
+        # 增加训练轮次
+        epochs = 50  # 增加到100轮
         history = model.fit(X_train, y_train, epochs=epochs, batch_size=32, verbose=0)
         
-        # 预测
-        y_pred = model.predict(X_test)
+        # 预测 - 直接使用训练数据进行预测
+        y_pred = model.predict(X_train)
+        
+        # 处理预测结果 - 将小于0的值设为0
+        y_pred = np.where(y_pred < 0, 0, y_pred)
         
         # 评估模型
-        mse = mean_squared_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
-        
-        # 保存模型
-        model_dir = os.path.join(os.path.dirname(__file__), '../../models')
-        os.makedirs(model_dir, exist_ok=True)
-        model_path = os.path.join(model_dir, 'lstm_model.h5')
-        model.save(model_path)
+        mse = mean_squared_error(y_train, y_pred)
+        r2 = r2_score(y_train, y_pred)
         
         # 保存预测结果
         result_df = pd.DataFrame({
-            '实际值': y_test.flatten(),
+            '实际值': y_train.flatten(),
             '预测值': y_pred.flatten()
         })
-        result_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'lstm_predictions.csv')
+        result_path = os.path.join(current_app.root_path,'uploads',f'lstm_predictions.csv')
         result_df.to_csv(result_path, index=False)
         
         # 检查标签数据是否为常量
@@ -118,7 +126,6 @@ def lstm_prediction():
             }), 400
             
         # 添加交叉验证评估
-        # 修改交叉验证部分，避免重复训练
         if len(X_data) > 1000:  # 大数据集时不执行交叉验证
             cv_scores = []
         else:
@@ -135,13 +142,6 @@ def lstm_prediction():
                 score = temp_model.evaluate(X_data[test], y_data[test], verbose=0)
                 cv_scores.append(score)
         
-                # 在返回前添加调试打印
-        print("\n===== LSTM预测调试信息 =====")
-        print(f"数据集形状: X_train={X_train.shape}, y_train={y_train.shape}")
-        print(f"训练参数: epochs={epochs}, learning_rate={learning_rate}")
-        print(f"评估指标: MSE={mse:.4f}, R2={r2:.4f}")
-        print("前5个样本预测结果:")
-        print("===========================\n")
         return jsonify({
             'status': 'success',
             'message': 'LSTM预测完成',

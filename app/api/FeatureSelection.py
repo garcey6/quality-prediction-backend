@@ -10,7 +10,7 @@ feature_selection_bp = Blueprint('feature_selection', __name__)
 @feature_selection_bp.route('/api/feature-selection/variables', methods=['GET'])
 def get_feature_variables():
     try:
-        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
+        file_path = os.path.join(current_app.root_path,'uploads',f'latest_upload.csv')
         if not os.path.exists(file_path):
             return jsonify({'status': 'error', 'message': '请先上传数据文件'}), 400
             
@@ -51,7 +51,7 @@ def feature_selection():
         method = data.get('method', 'pearson')
         
         # 从上传的文件获取数据
-        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
+        filepath = os.path.join(current_app.root_path,'uploads',f'latest_upload.csv')
         if not os.path.exists(filepath):
             return jsonify({
                 'status': 'error',
@@ -132,7 +132,7 @@ def feature_selection():
                             if score >= threshold]
         
         # 保存选择结果到文件
-        result_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'feature_selection_result.csv')
+        result_path = os.path.join(current_app.root_path,'uploads',f'feature_selection_result.csv')
         result_df = pd.DataFrame({
             'feature': selected_features,
             'score': feature_scores,

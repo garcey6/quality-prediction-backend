@@ -32,7 +32,7 @@ def visualize_prediction():
         
         # 根据模型类型获取预测结果文件
         pred_path = os.path.join(
-            current_app.config['UPLOAD_FOLDER'], 
+            current_app.root_path,'uploads',
             f'{model_type}_predictions.csv'
         )
         
@@ -81,10 +81,15 @@ def visualize_prediction():
         image_base64 = base64.b64encode(buf.read()).decode('utf-8')
         
         # 保存图片文件 - 修改为固定文件名
+        # 保存图片文件到static文件夹
         img_path = os.path.join(
-            current_app.config['UPLOAD_FOLDER'],
-            f'quality_prediction_{model_type}.png'  # 移除时间戳
+            current_app.root_path,  # 获取应用根目录
+            'static',  # static文件夹
+            f'quality_prediction_{model_type}.png'  # 直接保存在static目录
         )
+        
+        # 确保static目录存在
+        os.makedirs(os.path.dirname(img_path), exist_ok=True)
         with open(img_path, 'wb') as f:
             f.write(base64.b64decode(image_base64))
         
@@ -114,7 +119,7 @@ def export_prediction():
         export_format = data.get('format', 'png')  # 支持png/pdf/svg
         
         # 获取最新生成的图片
-        img_files = [f for f in os.listdir(current_app.config['UPLOAD_FOLDER']) 
+        img_files = [f for f in os.listdir(current_app.root_path,'static',) 
                     if f.startswith(f'quality_prediction_{model_type}')]
         
         if not img_files:
@@ -124,10 +129,10 @@ def export_prediction():
             }), 404
             
         latest_img = max(img_files, key=lambda x: os.path.getmtime(
-            os.path.join(current_app.config['UPLOAD_FOLDER'], x)
+            os.path.join(current_app.root_path,'uploads', x)
         ))
         
-        img_path = os.path.join(current_app.config['UPLOAD_FOLDER'], latest_img)
+        img_path = os.path.join(current_app.root_path,'uploads', latest_img)
         
         # 这里可以添加格式转换逻辑
         # 实际项目中可以根据export_format参数转换图片格式

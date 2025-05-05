@@ -10,7 +10,7 @@ standardize_bp = Blueprint('standardize', __name__)
 def standardize():
     try:
         # 获取文件路径
-        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'latest_upload.csv')
+        file_path = os.path.join(current_app.root_path,'uploads', f'latest_upload.csv')
         
         if not os.path.exists(file_path):
             return jsonify({'status': 'error', 'message': '请先上传数据文件'}), 400
@@ -19,10 +19,20 @@ def standardize():
         df = pd.read_csv(file_path)
         original_rows = len(df)
         
-        # 处理数值列
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        scaler = MinMaxScaler()
-        df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
+        # 读取目标变量
+        target_path = os.path.join(current_app.root_path,'uploads',f'target_variable.txt')
+        target_col = None
+        if os.path.exists(target_path):
+            with open(target_path, 'r') as f:
+                target_col = f.read().strip()
+        
+        # 处理数值列，排除目标变量列（改进比较方式）
+        numeric_cols = [col for col in df.select_dtypes(include=[np.number]).columns 
+                       if str(col).strip().lower() != str(target_col).strip().lower()] if target_col else df.select_dtypes(include=[np.number]).columns
+        
+        if numeric_cols:
+            scaler = MinMaxScaler()
+            df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
         
         # 保存处理后的数据
         df.to_csv(file_path, index=False)
@@ -32,7 +42,8 @@ def standardize():
             'message': '数据标准化完成',
             'data': {
                 'original_rows': original_rows,
-                'processed_rows': len(df)
+                'processed_rows': len(df),
+                'excluded_target': target_col if target_col else '无'
             }
         })
         

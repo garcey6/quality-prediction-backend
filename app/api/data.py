@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 
 data_bp = Blueprint('data', __name__)
 
-UPLOAD_FOLDER = 'uploads'
+DATA_FOLDER = 'data'  # 修改为data文件夹
 ALLOWED_EXTENSIONS = {'csv'}
 
 def allowed_file(filename):
@@ -23,30 +23,29 @@ def upload_file():
     
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
-        if not os.path.exists(UPLOAD_FOLDER):
-            os.makedirs(UPLOAD_FOLDER)
         
-        # 保存原始文件
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        # 保存原始文件到data文件夹
+        data_dir = os.path.join(current_app.root_path, 'data')
+        os.makedirs(data_dir, exist_ok=True)
+        filepath = os.path.join(data_dir, filename)
         file.save(filepath)
-        
-        # 创建latest_upload.csv副本
-        latest_path = os.path.join(UPLOAD_FOLDER, 'latest_upload.csv')
+        # 保存最新上传的文件到uploads文件夹
+        latest_path = os.path.join(current_app.root_path, 'uploads',f'latest_upload.csv')
         df = pd.read_csv(filepath)
-        df.to_csv(latest_path, index=False)  # 使用pandas保存确保格式一致
+        df.to_csv(latest_path, index=False)
         
         try:
-            # 读取原始数据（保留原始列名）
-            df = pd.read_csv(filepath, header=0)  # 确保使用第一行作为列名
+            # 读取原始数据
+            df = pd.read_csv(filepath, header=0)
             original_data = df.to_dict(orient='records')
             
-            # 创建处理后的数据副本（保持列名不变）
+            # 创建处理后的数据副本
             processed_data = df.copy().to_dict(orient='records')
             
             return jsonify({
                 'original': original_data,
                 'processed': processed_data,
-                'columns': list(df.columns)  # 返回列名列表
+                'columns': list(df.columns)
             }), 200
             
         except Exception as e:
