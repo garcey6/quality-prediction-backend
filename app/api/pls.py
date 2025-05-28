@@ -61,12 +61,60 @@ def pls_prediction():
         X = df[selected_features]
         y = df[actual_target_col]  # 使用处理后的列名
         
-        # 取1/10的样本进行测试
-        sample_fraction = 0.1
-        sample_size = int(len(X) * sample_fraction)
-        X = X.sample(n=sample_size, random_state=42)
-        y = y.loc[X.index]
+        # 固定取1950个样本进行测试
+        sample_size = 2000
+        if len(X) >= sample_size:
+            X = X.sample(n=sample_size, random_state=42)
+            y = y.loc[X.index]
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': f'数据量不足，需要至少{sample_size}个样本，当前只有{len(X)}个样本'
+            }), 400
+
+        # 数据标准化
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
         
+        # 扩展主成分数选择范围
+        max_components = min(20, len(selected_features))
+        
+        # 使用更严格的交叉验证
+        cv_folds = 10
+        
+        # 自动选择最佳组件数 - 添加标准差判断
+        best_n = 1
+        best_score = -np.inf
+        score_std_threshold = 0.05
+        
+        for n in range(1, max_components+1):
+            pls = PLSRegression(n_components=n, scale=True)
+            scores = cross_val_score(pls, X_scaled, y, cv=cv_folds, scoring='r2')
+            mean_score = np.mean(scores)
+            std_score = np.std(scores)
+            
+            if mean_score > best_score and std_score < score_std_threshold:
+                best_score = mean_score
+                best_n = n
+
+        # 使用交叉验证预测所有样本
+        pls = PLSRegression(
+            n_components=best_n,
+            scale=True,
+            max_iter=5000,
+            tol=1e-09,
+            copy=True
+        )
+        y_pred = cross_val_predict(pls, X_scaled, y, cv=10)
+        y_pred = np.where(y_pred < 0, 0, y_pred)
+        
+        # 训练最终模型用于保存
+        pls.fit(X_scaled, y)
+        
+        # 评估
+        mse = mean_squared_error(y, y_pred)
+        r2 = r2_score(y, y_pred)
+
         # 检查特征选择结果中的特征是否存在于数据中
         missing_features = [f for f in selected_features if f not in df.columns]
         if missing_features:
@@ -74,10 +122,6 @@ def pls_prediction():
                 'status': 'error',
                 'message': f'数据文件中缺少以下特征列: {", ".join(missing_features)}'
             }), 400
-        # 数据标准化
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        
         # 扩展主成分数选择范围
         max_components = min(20, len(selected_features))  # 从10增加到20
         

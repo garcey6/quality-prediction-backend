@@ -57,9 +57,17 @@ def lstm_prediction():
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
-        # 创建时间序列数据
+        # 创建时间序列数据 - 修改后的版本
         def create_dataset(X, y, time_step=50):
             X_data, y_data = [], []
+            # 为前time_step个点创建填充数据
+            for i in range(time_step):  # 修改为range(time_step)而不是range(time_step-1)
+                pad_size = time_step - i - 1
+                padded_X = np.vstack([np.zeros((pad_size, X.shape[1])), X[:i+1]])
+                X_data.append(padded_X)
+                y_data.append(y[i])
+            
+            # 正常时间窗口数据
             for i in range(len(X) - time_step):
                 X_data.append(X[i:(i + time_step)])
                 y_data.append(y[i + time_step])
@@ -67,14 +75,14 @@ def lstm_prediction():
             
         time_step = 50
         X_data, y_data = create_dataset(X_scaled, y.values, time_step)
-        
+
         # 检查并确保数据是三维的 (样本数, 时间步长, 特征数)
         if len(X_data.shape) != 3:
             return jsonify({
                 'status': 'error',
                 'message': f'数据维度错误，需要3维数据，当前维度: {X_data.shape}'
             }), 400
-            
+
         # 不再进行数据分割，直接使用全部数据
         X_train = X_data
         y_train = y_data
@@ -105,6 +113,11 @@ def lstm_prediction():
         
         # 处理预测结果 - 将小于0的值设为0
         y_pred = np.where(y_pred < 0, 0, y_pred)
+
+        # 评估时只使用有完整时间窗口的数据
+        eval_start = time_step - 1
+        mse = mean_squared_error(y_train[eval_start:], y_pred[eval_start:])
+        r2 = r2_score(y_train[eval_start:], y_pred[eval_start:])
         
         # 评估模型
         mse = mean_squared_error(y_train, y_pred)

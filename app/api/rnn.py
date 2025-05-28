@@ -19,6 +19,11 @@ def rnn_prediction():
             
         data = request.json
         
+        # 获取前端参数
+        rnn_type = data.get('rnn_type', 'SimpleRNN')
+        network_params = data.get('network_params', {})
+        train_params = data.get('train_params', {})
+        
         # 读取数据文件
         data_path = os.path.join(current_app.root_path,'uploads',f'latest_upload.csv')
         if not os.path.exists(data_path):
@@ -55,47 +60,61 @@ def rnn_prediction():
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
-        # 创建时间序列数据
-        def create_dataset(X, y, time_step=50):  # 使用更大的时间窗口
+        # 创建时间序列数据 - 修改后的版本
+        def create_dataset(X, y, time_step=50):
             X_data, y_data = [], []
+            # 为前time_step个点创建填充数据
+            for i in range(time_step):
+                pad_size = time_step - i - 1
+                padded_X = np.vstack([np.zeros((pad_size, X.shape[1])), X[:i+1]])
+                X_data.append(padded_X)
+                y_data.append(y[i])
+            
+            # 正常时间窗口数据
             for i in range(len(X) - time_step):
                 X_data.append(X[i:(i + time_step)])
                 y_data.append(y[i + time_step])
             return np.array(X_data), np.array(y_data)
             
-        time_step = 50  # 增加时间步长
+        time_step = 50
         X_data, y_data = create_dataset(X_scaled, y.values, time_step)
         
-        # 构建RNN模型
+        # 构建RNN模型 - 使用前端参数
         model = Sequential()
-        model.add(SimpleRNN(units=50,  # 增加单元数
-                      return_sequences=False,
-                      input_shape=(X_data.shape[1], X_data.shape[2]),
-                      activation='tanh'))
-        model.add(Dense(units=1, activation='linear'))  # 明确指定线性激活
+        model.add(SimpleRNN(
+            units=network_params.get('hidden_units', 50),
+            return_sequences=False,
+            input_shape=(X_data.shape[1], X_data.shape[2]),
+            activation='tanh'
+        ))
+        model.add(Dense(units=1, activation='linear'))
         
-        # 设置学习率与优化器
-        learning_rate = 0.001  # 使用更小的学习率
+        # 设置学习率与优化器 - 使用前端参数
+        learning_rate = train_params.get('learning_rate', 0.001)
         optimizer = Adam(learning_rate=learning_rate)
         model.compile(optimizer=optimizer, loss='mean_squared_error')
         
-        # 训练模型参数调整
-        epochs = 100  # 增加训练轮次
-        batch_size = 32  # 使用更大的batch size
+        # 训练模型参数调整 - 使用前端参数
+        epochs = train_params.get('epochs', 100)
+        batch_size = train_params.get('batch_size', 32)
         
         # 训练模型
-        history = model.fit(X_data, y_data,
-                          epochs=epochs,
-                          batch_size=batch_size,
-                          verbose=0)  # 关闭训练过程输出
+        history = model.fit(
+            X_data, y_data,
+            epochs=epochs,
+            batch_size=batch_size,
+            verbose=0
+        )
         
         # 预测
         y_pred = model.predict(X_data)
-        y_pred = np.where(y_pred < 0, 0, y_pred)  # 处理负值
+        y_pred = np.where(y_pred < 0, 0, y_pred)
         
         # 评估
-        mse = mean_squared_error(y_data, y_pred)
-        r2 = r2_score(y_data, y_pred)
+        # 评估时只使用有完整时间窗口的数据
+        eval_start = time_step
+        mse = mean_squared_error(y_data[eval_start:], y_pred[eval_start:])
+        r2 = r2_score(y_data[eval_start:], y_pred[eval_start:])
         
         # 保存结果
         result_df = pd.DataFrame({
@@ -111,6 +130,7 @@ def rnn_prediction():
             'data': {
                 'mse': float(mse),
                 'r2_score': float(r2),
+                'epochs': epochs,  # 返回实际使用的epochs数
                 'predictions': y_pred.flatten().tolist()
             }
         })

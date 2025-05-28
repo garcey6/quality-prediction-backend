@@ -1,14 +1,19 @@
 from flask import Blueprint, request, jsonify, current_app
 import pandas as pd
 import os
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+import base64
+from io import BytesIO
 from sklearn.feature_selection import mutual_info_regression
 from scipy.stats import pearsonr
 
 feature_selection_bp = Blueprint('feature_selection', __name__)
 
-# 新增获取变量列表接口
-@feature_selection_bp.route('/api/feature-selection/variables', methods=['GET'])
-def get_feature_variables():
+# 新增热力图生成接口
+@feature_selection_bp.route('/api/feature-selection/heatmap', methods=['GET'])
+def get_heatmap():
     try:
         file_path = os.path.join(current_app.root_path,'uploads',f'latest_upload.csv')
         if not os.path.exists(file_path):
@@ -16,15 +21,32 @@ def get_feature_variables():
             
         df = pd.read_csv(file_path)
         
-        # 只返回变量名数组
-        variables = [col for col in df.columns]
+        # 计算相关系数矩阵
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        corr_matrix = df[numeric_cols].corr()
         
-        return jsonify(variables)
+        # 生成热力图
+        plt.figure(figsize=(12, 10))
+        sns.heatmap(corr_matrix, annot=True, fmt=".2f", cmap='coolwarm', 
+                   cbar=True, square=True)
+        plt.title('Feature Correlation Heatmap')
+        
+        # 转换为base64编码
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        plt.close()
+        
+        return jsonify({
+            'status': 'success',
+            'image': image_base64
+        })
         
     except Exception as e:
         return jsonify({
             'status': 'error',
-            'message': f'获取变量列表失败: {str(e)}'
+            'message': f'生成热力图失败: {str(e)}'
         }), 500
 
 # 修改特征选择接口
@@ -35,11 +57,9 @@ def feature_selection():
             return jsonify({'error': '请求必须是JSON格式'}), 400
             
         data = request.json
-        target_var = data.get('target_variable')  # 修改参数名
-        threshold = data.get('threshold')
+        threshold = data.get('threshold', 0.5)  # 默认阈值设为0.5
+        method = data.get('method', 'pearson')  # 默认使用pearson方法
         
-        if not target_var:
-            return jsonify({'error': '缺少target_variable参数'}), 400
         if threshold is None:
             return jsonify({'error': '缺少threshold参数'}), 400
             
@@ -48,8 +68,6 @@ def feature_selection():
         except ValueError:
             return jsonify({'error': 'threshold必须是数值类型'}), 400
             
-        method = data.get('method', 'pearson')
-        
         # 从上传的文件获取数据
         filepath = os.path.join(current_app.root_path,'uploads',f'latest_upload.csv')
         if not os.path.exists(filepath):
@@ -70,19 +88,16 @@ def feature_selection():
                 'data': None
             }), 500
 
-        # 检查目标变量是否存在
-        if target_var not in df.columns:
+        # 读取特征选择结果文件获取目标变量
+        selection_path = os.path.join(current_app.root_path,'uploads',f'feature_selection_result.csv')
+        if not os.path.exists(selection_path):
             return jsonify({
                 'status': 'error',
-                'code': 400,
-                'message': f'目标变量"{target_var}"不存在',
-                'data': {
-                    'available_columns': list(df.columns)
-                }
+                'message': '请先进行特征选择'
             }), 400
             
-        # 使用原始列名
-        actual_target_var = target_var
+        selected_df = pd.read_csv(selection_path)
+        actual_target_var = selected_df['target'].iloc[0]
         
         # 分离特征和目标变量
         X = df.drop(columns=[actual_target_var])
@@ -136,20 +151,17 @@ def feature_selection():
         result_df = pd.DataFrame({
             'feature': selected_features,
             'score': feature_scores,
-            'target': [actual_target_var] * len(selected_features)  # 添加目标变量信息
+            'target': [actual_target_var] * len(selected_features)
         })
         result_df.to_csv(result_path, index=False)
 
         return jsonify({
             'status': 'success',
-            'message': f'使用{method}方法选择了{len(selected_features)}个特征'
+            'message': f'使用{method}方法选择了{len(selected_features)}个特征',
+            'selected_features': selected_features,
+            'scores': feature_scores
         })
         
-    except ValueError as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 400
     except Exception as e:
         return jsonify({
             'status': 'error',

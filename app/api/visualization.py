@@ -87,6 +87,14 @@ def generate_correlation_heatmap(file_path):
     plt.xticks(rotation=45)
     plt.yticks(rotation=0)
     
+    # 确保static目录存在
+    static_dir = os.path.join(current_app.root_path, 'static')
+    os.makedirs(static_dir, exist_ok=True)
+    
+    # 保存到static目录
+    static_path = os.path.join(static_dir, 'correlation_heatmap.png')
+    plt.savefig(static_path, format='png', dpi=150, bbox_inches='tight')
+    
     # 转换为base64
     buf = BytesIO()
     plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')

@@ -60,49 +60,91 @@ def visualize_prediction():
             'mae': mean_absolute_error(df['实际值'], df['预测值']),
             '样本数': len(df)
         }
-        
-        # 创建可视化图形 - 改为单图形式
+
+        # 创建预测对比图
         plt.figure(figsize=(10, 6))
-        # 对实际值进行排序，并保持预测值对应关系
         sorted_indices = np.argsort(df['实际值'].values)
         plt.plot(np.sort(df['实际值'].values), color='blue', label='实际值', linewidth=2)
         plt.plot(df['预测值'].values[sorted_indices], color='red', label='预测值', linewidth=2)
         plt.title(f'{model_type.upper()}预测结果对比(按实际值排序)')
+        
         plt.xlabel('样本(按实际值排序)')
         plt.ylabel('浓度值')
         plt.legend()
         plt.tight_layout()
-        
-        # 转换为base64
+
+        # 保存预测对比图
         buf = BytesIO()
         plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
         plt.close()
         buf.seek(0)
         image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+
+        # 创建残差图
+        plt.figure(figsize=(10, 6))
+        residuals = df['实际值'] - df['预测值']
         
-        # 保存图片文件 - 修改为固定文件名
+        # 计算纵坐标范围，使用实际值的范围乘以一个系数
+        y_range = df['实际值'].max() - df['实际值'].min()
+        y_padding = y_range * 0.2  # 添加20%的padding
+        
+        # 随机采样50%的数据点
+        sample_size = int(len(df) * 0.5)
+        indices = np.random.choice(len(df), size=sample_size, replace=False)
+        sampled_predictions = df['预测值'].values[indices]
+        sampled_residuals = residuals.values[indices]
+        
+        # 绘制采样后的散点图
+        plt.scatter(sampled_predictions, sampled_residuals, color='green', alpha=0.2)
+        plt.axhline(y=0, color='red', linestyle='--')
+        plt.title(f'{model_type.upper()}预测残差图(50%采样)')
+        plt.xlabel('预测值')
+        plt.ylabel('残差(实际值-预测值)')
+        
+        # 设置纵坐标范围
+        plt.ylim(-y_padding, y_padding)
+        
+        plt.tight_layout()
+
+        # 保存残差图
+        residual_buf = BytesIO()
+        plt.savefig(residual_buf, format='png', dpi=150, bbox_inches='tight')
+        plt.close()
+        residual_buf.seek(0)
+        residual_image_base64 = base64.b64encode(residual_buf.read()).decode('utf-8')
+
         # 保存图片文件到static文件夹
         img_path = os.path.join(
-            current_app.root_path,  # 获取应用根目录
-            'static',  # static文件夹
-            f'quality_prediction_{model_type}.png'  # 直接保存在static目录
+            current_app.root_path,
+            'static',
+            f'quality_prediction_{model_type}.png'
+            
         )
-        
+        residual_img_path = os.path.join(
+            current_app.root_path,
+            'static',
+            f'residual_plot_{model_type}.png'
+        )
+
         # 确保static目录存在
         os.makedirs(os.path.dirname(img_path), exist_ok=True)
         with open(img_path, 'wb') as f:
             f.write(base64.b64decode(image_base64))
-        
+        with open(residual_img_path, 'wb') as f:
+            f.write(base64.b64decode(residual_image_base64))
+
         return jsonify({
             'status': 'success',
             'message': f'{model_type.upper()}预测可视化完成',
             'data': {
                 'metrics': metrics,
-                'image': image_base64,
-                'image_path': img_path
+                'image': image_base64,  # 预测对比图
+                'residual_image': residual_image_base64,  # 残差图
+                'image_path': img_path,
+                'residual_image_path': residual_img_path
             }
         })
-        
+
     except Exception as e:
         current_app.logger.error(f'质量预测可视化错误: {str(e)}', exc_info=True)
         return jsonify({
